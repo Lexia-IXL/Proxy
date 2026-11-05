@@ -1,7 +1,7 @@
 {
-  "name": "fully-rewriting-web-proxy",
-  "version": "1.3.0",
-  "description": "An advanced rewriting web proxy for Render",
+  "name": "ultimate-arcade-proxy-portal",
+  "version": "2.0.0",
+  "description": "All-in-one anonymous proxy, custom search engine, and arcade games suite.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
