@@ -3,120 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Proxy Portal</title>
+    <title>Nexus Hub: Search, Games & Proxy</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0b0c10; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; }
-        #bg-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        .container { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; padding: 20px; text-align: center; }
-        h1 { font-size: 3rem; margin-bottom: 10px; color: #66fcf1; text-shadow: 0 0 10px rgba(102, 252, 241, 0.3); }
-        p { font-size: 1.1rem; color: #c5c6c7; margin-bottom: 30px; }
-        .search-box { width: 100%; max-width: 600px; display: flex; background: rgba(31, 40, 51, 0.8); border: 2px solid #45f3ff; border-radius: 30px; padding: 5px 15px; box-shadow: 0 0 15px rgba(69, 243, 255, 0.2); transition: 0.3s; }
-        .search-box:focus-within { box-shadow: 0 0 25px rgba(69, 243, 255, 0.4); }
-        .search-box input { flex: 1; background: none; border: none; outline: none; padding: 12px 10px; font-size: 1.1rem; color: #fff; }
-        .search-box button { background: #66fcf1; border: none; outline: none; color: #0b0c10; padding: 0 25px; font-weight: bold; border-radius: 20px; cursor: pointer; transition: 0.2s; }
-        .search-box button:hover { background: #45f3ff; transform: scale(1.05); }
-        .quick-links { display: flex; gap: 15px; margin-top: 35px; flex-wrap: wrap; justify-content: center; }
-        .link-card { background: rgba(31, 40, 51, 0.6); border: 1px solid #1f2833; padding: 15px 25px; border-radius: 12px; cursor: pointer; min-width: 120px; transition: 0.3s; font-weight: 500; text-transform: capitalize; }
-        .link-card:hover { border-color: #66fcf1; background: rgba(102, 252, 241, 0.1); transform: translateY(-3px); }
+        body, html { width: 100%; height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background-color: #06070d; color: #fff; overflow-x: hidden; }
+        
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        
+        .navbar { position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; background: rgba(10, 12, 22, 0.85); border-bottom: 1px solid #1f2335; backdrop-filter: blur(10px); }
+        .logo { font-size: 1.6rem; font-weight: 800; color: #45f3ff; text-shadow: 0 0 10px rgba(69,243,255,0.3); }
+        .nav-tabs { display: flex; gap: 10px; }
+        .tab-btn { background: none; border: 1px solid transparent; color: #a9b1d6; padding: 8px 20px; font-size: 1rem; border-radius: 6px; cursor: pointer; transition: 0.3s; font-weight: 500; }
+        .tab-btn:hover { color: #45f3ff; background: rgba(69, 243, 255, 0.05); }
+        .tab-btn.active { color: #06070d; background: #45f3ff; border-color: #45f3ff; box-shadow: 0 0 15px rgba(69,243,255,0.4); }
+
+        .main-content { position: relative; z-index: 5; max-width: 1200px; margin: 60px auto; padding: 0 20px; width: 100%; }
+        .panel { display: none; width: 100%; animation: fadeIn 0.4s ease forwards; }
+        .panel.active { display: block; }
+
+        /* SEARCH ENGINE CSS */
+        .search-container { text-align: center; max-width: 700px; margin: 40px auto; }
+        .search-container h2 { font-size: 2.5rem; margin-bottom: 25px; color: #fff; font-weight: 700; }
+        .search-container h2 span { color: #45f3ff; }
+        .search-type-selector { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .type-label { background: #1a1b26; border: 1px solid #292e42; padding: 6px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: 0.2s; }
+        .type-label input { display: none; }
+        .type-label:has(input:checked) { border-color: #45f3ff; background: rgba(69, 243, 255, 0.1); color: #45f3ff; }
+        
+        .search-bar-wrap { display: flex; background: rgba(26, 27, 38, 0.9); border: 2px solid #292e42; border-radius: 50px; padding: 6px 10px; width: 100%; transition: 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .search-bar-wrap:focus-within { border-color: #45f3ff; box-shadow: 0 0 20px rgba(69, 243, 255, 0.2); }
+        .search-bar-wrap input { flex: 1; background: none; border: none; outline: none; padding: 10px 15px; font-size: 1.1rem; color: #fff; }
+        .search-bar-wrap button { background: #45f3ff; border: none; outline: none; color: #06070d; padding: 0 30px; font-weight: bold; border-radius: 40px; cursor: pointer; transition: 0.2s; }
+        .search-bar-wrap button:hover { background: #3ad2db; transform: scale(1.02); }
+
+        /* GAMES ARCHITECT GRID */
+        .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; margin-top: 20px; }
+        .game-card { background: rgba(26, 27, 38, 0.85); border: 1px solid #292e42; border-radius: 12px; padding: 20px; transition: 0.3s; display: flex; flex-direction: column; justify-content: space-between; min-height: 200px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); backdrop-filter: blur(5px); }
+        .game-card:hover { border-color: #ff007f; transform: translateY(-5px); box-shadow: 0 10px 25px rgba(255, 0, 127, 0.2); }
+        .game-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; color: #ff007f; }
+        .game-desc { font-size: 0.95rem; color: #a9b1d6; line-height: 1.4; margin-bottom: 20px; }
+        .game-btn { background: none; border: 1px solid #ff007f; color: #ff007f; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; text-align: center; text-decoration: none; }
+        .game-btn:hover { background: #ff007f; color: #fff; box-shadow: 0 0 15px rgba(255,0,127,0.4); }
+
+        .game-viewport-wrap { display: none; width: 100%; height: 75vh; background: #000; border: 2px solid #ff007f; border-radius: 12px; overflow: hidden; margin-top: 20px; position: relative; }
+        .game-viewport-wrap iframe { width: 100%; height: 100%; border: none; }
+        .close-game-btn { position: absolute; top: 15px; right: 15px; background: rgba(255,0,127,0.9); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; z-index: 20; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
     <canvas id="bg-canvas"></canvas>
 
-    <div class="container">
-        <h1>Proxy Portal</h1>
-        <p>Enter any URL address below to browse dynamically through your network node.</p>
-        
-        <form class="search-box" id="proxy-form">
-            <input type="text" id="target-input" placeholder="Enter target URL (e.g., https://example.com)..." required autocomplete="off">
-            <button type="submit">Launch</button>
-        </form>
-
-        <div class="quick-links">
-            <div class="link-card" onclick="quickLaunch('https://www.google.com')">Google</div>
-            <div class="link-card" onclick="quickLaunch('https://wikipedia.org')">Wikipedia</div>
-            <div class="link-card" onclick="quickLaunch('https://www.reddit.com')">Reddit</div>
-            <div class="link-card" onclick="quickLaunch('https://ycombinator.com')">HackerNews</div>
+    <nav class="navbar">
+        <div class="logo">NEXUS.HUB</div>
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('search')">Search Engine</button>
+            <button class="tab-btn" onclick="switchTab('games')">Arcade Games</button>
         </div>
-    </div>
+    </nav>
+
+    <main class="main-content">
+        <!-- TAB 1: SEARCH ENGINE PANEL -->
+        <div id="search-panel" class="panel active">
+            <div class="search-container">
+                <h2>Nexus <span>Search</span></h2>
+                <div class="search-type-selector">
+                    <label class="type-label"><input type="radio" name="stype" value="web" checked> Web Index</label>
+                    <label class="type-label"><input type="radio" name="stype" value="video"> Streaming Video (YT Proxy)</label>
+                </div>
+                <form class="search-bar-wrap" action="/engine/search" method="GET" onsubmit="return handleSearchSubmit(this)">
+                    <input type="text" name="q" id="search-query" placeholder="Search keywords or input explicit link target URL..." required autocomplete="off">
+                    <input type="hidden" name="type" id="search-type-hidden" value="web">
+                    <button type="submit">Execute</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB 2: ARCADE GAMES PANEL -->
+        <div id="games-panel" class="panel">
+            <div id="games-list-view">
+                <div class="games-grid">
+                    <div class="game-card">
+                        <div>
+                            <div class="game-title">Retro Snake</div>
+                            <div class="game-desc">The classic pixel retro arcade game. Consume neon blocks, grow long, and beat the highscore system.</div>
+                        </div>
+                        <button class="game-btn" onclick="launchLocalGame('snake')">Play Now</button>
+                    </div>
+                    <div class="game-card">
+                        <div>
+                            <div class="game-title">Space Invaders</div>
+                            <div class="game-desc">Retro space arcade shooter. Defend your base installations against descending waves of aliens.</div>
+                        </div>
+                        <button class="game-btn" onclick="launchLocalGame('space')">Play Now</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="game-display-container" class="game-viewport-wrap">
+                <button class="close-game-btn" onclick="closeGameViewport()">Exit Game</button>
+                <div id="game-embed-target" style="width:100%; height:100%;"></div>
+            </div>
+        </div>
+    </main>
 
     <script>
-        // Form search submission handler logic
-        document.getElementById('proxy-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            let inputUrl = document.getElementById('target-input').value.trim();
-            if(inputUrl) executeRoute(inputUrl);
-        });
-
-        function quickLaunch(url) {
-            executeRoute(url);
+        // Tab switching navigation logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`${tabId}-panel`).classList.add('active');
+            if(tabId !== 'games') closeGameViewport();
         }
 
-        function executeRoute(url) {
-            // Strip structural protocols to prevent parsing mismatches before routing execution
-            let formattedUrl = url;
-            if (!/^https?:\/\//i.test(formattedUrl)) {
-                formattedUrl = 'https://' + formattedUrl;
+        // Search engine preprocessing injection
+        function handleSearchSubmit(form) {
+            const selectedType = document.querySelector('input[name="stype"]:checked').value;
+            const queryValue = document.getElementById('search-query').value.trim();
+            document.getElementById('search-type-hidden').value = selectedType;
+
+            // Direct URL entry override check
+            if (/^https?:\/\/[^\s$.?#].[^\s]*$/i.test(queryValue)) {
+                form.action = `/service/${encodeURIComponent(queryValue)}`;
+                form.removeAttribute('method'); // Drop standard query bindings
+                return true;
             }
-            // Construct the path endpoint match
-            window.location.href = window.location.origin + '/service/' + encodeURIComponent(formattedUrl);
+            return true;
         }
 
-        // Particle background generation engine logic
-        const canvas = document.getElementById('bg-canvas');
-        const ctx = canvas.getContext('2d');
-        let particles = [];
+        // Local game loader scripts injection
+        function launchLocalGame(gameKey) {
+            document.getElementById('games-list-view').style.display = 'none';
+            const target = document.getElementById('game-embed-target');
+            const viewport = document.getElementById('game-display-container');
+            viewport.style.display = 'block';
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        class Particle {
-            constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 2 + 1;
-                this.speedX = Math.random() * 0.6 - 0.3;
-                this.speedY = Math.random() * 0.6 - 0.3;
-                this.alpha = Math.random() * 0.5 + 0.2;
-            }
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
-                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
-            }
-            draw() {
-                ctx.fillStyle = `rgba(102, 252, 241, ${this.alpha})`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
+            if(gameKey === 'snake') {
+                target.innerHTML = `<iframe src="https://github.io" style="width:100%; height:100%; border:none;"></iframe>`;
+            } else if(gameKey === 'space') {
+                target.innerHTML = `<iframe src="https://github.io" style="width:100%; height:100%; border:none;"></iframe>`;
             }
         }
 
-        function initParticles() {
-            particles = [];
-            const count = Math.floor((canvas.width * canvas.height) / 9000);
-            for (let i = 0; i < count; i++) {
-                particles.push(new Particle());
-            }
+        function closeGameViewport() {
+            document.getElementById('game-display-container').style.display = 'none';
+            document.getElementById('game-embed-target').innerHTML = '';
+            document.getElementById('games-list-view').style.display = 'block';
         }
-        initParticles();
-
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
-            requestAnimationFrame(animate);
-        }
-        animate();
-    </script>
-</body>
-</html>
