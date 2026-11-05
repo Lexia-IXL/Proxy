@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Proxy Portal</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #0a0a12; color: #fff; overflow-hidden: relative; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .container { position: relative; z-index: 2; width: 90%; max-width: 650px; background: rgba(20, 20, 35, 0.75); padding: 40px; border-radius: 16px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); text-align: center; }
+        h1 { font-size: 2.5rem; margin-bottom: 10px; background: linear-gradient(45deg, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        p { color: #8a8ab0; margin-bottom: 30px; font-size: 1rem; }
+        .search-box { display: flex; width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 30px; padding: 5px 5px 5px 20px; margin-bottom: 35px; transition: 0.3s; }
+        .search-box:focus-within { border-color: #00f2fe; box-shadow: 0 0 15px rgba(0, 242, 254, 0.3); }
+        .search-box input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 1.1rem; }
+        .search-box button { background: linear-gradient(45deg, #00f2fe, #4facfe); border: none; outline: none; color: #fff; padding: 12px 30px; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .search-box button:hover { opacity: 0.9; transform: scale(1.02); }
+        .quick-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .link-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; cursor: pointer; transition: 0.3s; font-weight: 500; }
+        .link-card:hover { background: rgba(0, 242, 254, 0.1); border-color: #00f2fe; transform: translateY(-3px); }
+    </style>
+</head>
+<body>
+    <canvas id="particles"></canvas>
+    <div class="container">
+        <h1>Web Proxy Portal</h1>
+        <p>Enter any URL or use the quick-launch tiles below to route traffic securely through your Render instance.</p>
+        
+        <div class="search-box">
+            <input type="text" id="urlInput" placeholder="Enter target site URL (e.g., wikipedia.org)..." onkeydown="if(event.key === 'Enter') launchProxy()">
+            <button onclick=launchProxy()>Go</button>
+        </div>
+
+        <div class="quick-links">
+            <div class="link-card" onclick="launchUrl('https://www.google.com')">Google</div>
+            <div class="link-card" onclick="launchUrl('https://www.wikipedia.org')">Wikipedia</div>
+            <div class="link-card" onclick="launchUrl('https://www.reddit.com')">Reddit</div>
+        </div>
+    </div>
+
+    <script>
+        function launchProxy() {
+            let input = document.getElementById('urlInput').value.trim();
+            if (!input) return;
+            launchUrl(input);
+        }
+
+        function launchUrl(url) {
+            if (!/^https?:\/\//i.test(url)) {
+                url = 'https://' + url;
+            }
+            window.location.href = window.location.origin + '/service/' + encodeURIComponent(url);
+        }
+
+        // Animated Particle Background Canvas Script
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 1;
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * 0.5 - 0.25;
+                this.color = Math.random() > 0.5 ? 'rgba(0, 242, 254, 0.3)' : 'rgba(79, 172, 254, 0.3)';
+            }
+            update() {
+                this.x += this.xSpeed = this.speedX;
+                this.y += this.ySpeed = this.speedY;
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.width) this.speedY *= -1;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 70; i++) {
+            particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
