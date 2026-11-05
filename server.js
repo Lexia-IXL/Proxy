@@ -6,10 +6,34 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Host our interactive user dashboard UI natively
+// Host static assets safely from the public folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Intercept routing logic via explicit proxy base endpoint
+// 1. ENGINE SEARCH ROUTER - Decoupled query processor
+app.get('/engine/search', (req, res) => {
+    const query = req.query.q;
+    const type = req.query.type || 'web';
+
+    if (!query) {
+        return res.redirect('/');
+    }
+
+    // Hand-off target to decentralized privacy routing matrices
+    let targetRedirect = '';
+    if (type === 'video' || query.toLowerCase().includes('youtube.com') || query.toLowerCase().includes('youtube')) {
+        // Strip down query parameters to extract standard search indicators if present
+        const searchTerms = query.replace(/https?:\/\/(www\.)?youtube\.com\/results\?search_query=/, '').replace(/https?:\/\/(www\.)?youtube\.com\//, '');
+        // Route through high-speed decentralized open video index nodes
+        targetRedirect = `/service/${encodeURIComponent('https://yewtu.be' + encodeURIComponent(searchTerms))}`;
+    } else if (type === 'web') {
+        // Route web requests via DuckDuckGo's lightweight, non-JS tracking template
+        targetRedirect = `/service/${encodeURIComponent('https://duckduckgo.com' + encodeURIComponent(query))}`;
+    }
+
+    return res.redirect(targetRedirect);
+});
+
+// 2. REWRITING REVERSE PROXY CORE ENGINE
 app.use('/service/:targetUrl*', (req, res, next) => {
     let targetParam = req.params.targetUrl;
 
@@ -32,39 +56,32 @@ app.use('/service/:targetUrl*', (req, res, next) => {
             changeOrigin: true,
             followRedirects: true,
             secure: true,
-            selfHandleResponse: true, // Necessary to let our interceptor modify the HTML payload body
+            selfHandleResponse: true, // Intercept to inject rewritten link targets
 
             on: {
                 proxyReq: (proxyReq, req, res) => {
-                    // Inject real device metadata profiles to mitigate request blocks
-                    proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+                    proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
                     proxyReq.setHeader('Referer', targetOrigin);
                     proxyReq.setHeader('Origin', targetOrigin);
-                    
-                    // Force the destination to return clean uncompressed text arrays if they support it
                     proxyReq.setHeader('Accept-Encoding', 'identity');
                 },
                 proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
                     const contentType = proxyRes.headers['content-type'] || '';
                     
-                    // Clean up cross-site constraints
                     delete res.getHeaders()['content-security-policy'];
                     delete res.getHeaders()['content-security-policy-report-only'];
                     delete res.getHeaders()['x-frame-options'];
                     res.setHeader('Access-Control-Allow-Origin', '*');
 
-                    // ONLY parse and rewrite if the incoming stream is HTML data
                     if (contentType.includes('text/html')) {
                         let htmlContent = responseBuffer.toString('utf8');
                         const root = parse(htmlContent);
 
-                        // Helper function to turn relative or absolute URLs into proxy-routed links
                         const convertToProxyPath = (urlStr) => {
                             if (!urlStr || urlStr.startsWith('javascript:') || urlStr.startsWith('#') || urlStr.startsWith('data:')) {
                                 return urlStr;
                             }
                             try {
-                                // Resolve relative URLs back to their full target destination origin
                                 const absoluteUrl = new URL(urlStr, targetOrigin).href;
                                 return proxyBaseUrl + encodeURIComponent(absoluteUrl);
                             } catch (e) {
@@ -72,7 +89,7 @@ app.use('/service/:targetUrl*', (req, res, next) => {
                             }
                         };
 
-                        // Sweep and rewrite document anchors, scripts, stylesheets, and images
+                        // Transform standard nodes to pass down recursively through our domain path layer
                         root.querySelectorAll('a').forEach(el => el.setAttribute('href', convertToProxyPath(el.getAttribute('href'))));
                         root.querySelectorAll('script').forEach(el => el.setAttribute('src', convertToProxyPath(el.getAttribute('src'))));
                         root.querySelectorAll('link').forEach(el => el.setAttribute('href', convertToProxyPath(el.getAttribute('href'))));
@@ -82,32 +99,30 @@ app.use('/service/:targetUrl*', (req, res, next) => {
                         return root.toString();
                     }
 
-                    // Leave standard audio/video chunks and stylesheets intact
                     return responseBuffer;
                 }),
                 error: (err, req, res) => {
                     if (!res.headersSent) {
-                        res.status(500).json({ error: 'Proxy Gateway Mismatch', details: err.message });
+                        res.status(500).json({ error: 'Proxy Node Timed Out', details: err.message });
                     }
                 }
             },
             pathRewrite: (rawPath, req) => {
-                // Strips the service handler prefix sequence cleanly out of data loops
                 return rawPath.replace(/^\/service\/[^/]+/, '') || '/';
             }
         });
 
         proxy(req, res, next);
     } catch (e) {
-        return res.status(400).json({ error: 'Failed processing destination string parameters.' });
+        return res.status(400).json({ error: 'Failed parsing parameters.' });
     }
 });
 
-// Default fallback rule routing missing asset lookups to the main index layout
+// Direct catch-all routing fallback rules to primary interface
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Rewriting proxy server operating safely on port ${PORT}`);
+    console.log(`Ultimate Proxy Portal operating on port ${PORT}`);
 });
