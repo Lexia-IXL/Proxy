@@ -1,14 +1,15 @@
 {
-  "name": "render-web-proxy-v2",
-  "version": "2.0.0",
-  "description": "Advanced web proxy with visual engine portal",
+  "name": "fully-rewriting-web-proxy",
+  "version": "1.3.0",
+  "description": "An advanced rewriting web proxy for Render",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "http-proxy-middleware": "^3.0.0"
+    "http-proxy-middleware": "^3.0.0",
+    "node-html-parser": "^6.1.13"
   },
   "engines": {
     "node": ">=18.0.0"
