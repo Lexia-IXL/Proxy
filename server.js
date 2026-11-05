@@ -5,42 +5,34 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve static interface assets
+// Host static visual assets from the public asset folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Dynamic reverse proxy engine
+// Intercept routing logic from search endpoint parameter
 app.use('/service/:targetUrl*', (req, res, next) => {
-    let rawTarget = req.params.targetUrl + (req.params[0] || '');
+    // Decodes path string parameters natively matching the frontend structure engine
+    let targetParam = req.params.targetUrl;
     
-    // Support path resolution query patterns
-    if (!rawTarget && req.query.url) {
-        rawTarget = req.query.url;
-    }
-
-    if (!rawTarget) {
-        return res.status(400).json({ error: 'Missing destination target URL parameter.' });
-    }
-
-    let targetBase = rawTarget;
-    if (!/^https?:\/\//i.test(targetBase)) {
-        targetBase = 'https://' + targetBase;
-    }
-
     try {
-        const parsedTarget = new URL(targetBase);
-        const originUrl = parsedTarget.origin;
+        let decodedTarget = decodeURIComponent(targetParam);
+        
+        if (!/^https?:\/\//i.test(decodedTarget)) {
+            decodedTarget = 'https://' + decodedTarget;
+        }
+
+        const parsedUrl = new URL(decodedTarget);
+        const targetOrigin = parsedUrl.origin;
 
         const proxy = createProxyMiddleware({
-            target: originUrl,
+            target: targetOrigin,
             changeOrigin: true,
             followRedirects: true,
             secure: true,
             on: {
                 proxyReq: (proxyReq, req, res) => {
-                    proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-                    proxyReq.setHeader('Accept-Language', 'en-US,en;q=0.9');
-                    proxyReq.setHeader('Referer', originUrl);
-                    proxyReq.setHeader('Origin', originUrl);
+                    proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+                    proxyReq.setHeader('Referer', targetOrigin);
+                    proxyReq.setHeader('Origin', targetOrigin);
                 },
                 proxyRes: (proxyRes, req, res) => {
                     delete proxyRes.headers['content-security-policy'];
@@ -51,23 +43,28 @@ app.use('/service/:targetUrl*', (req, res, next) => {
                     proxyRes.headers['Access-Control-Allow-Headers'] = '*';
                 },
                 error: (err, req, res) => {
-                    console.error('Proxy Error:', err.message);
                     if (!res.headersSent) {
-                        res.status(500).json({ error: 'Proxy route failure.', details: err.message });
+                        res.status(500).json({ error: 'Proxy Request Mismatch', details: err.message });
                     }
                 }
             },
-            pathRewrite: (path, req) => {
-                return path.replace(/^\/service\/[^/]+/, '');
+            pathRewrite: (rawPath, req) => {
+                // Strips service prefixes safely to balance target path parameters
+                return rawPath.replace(/^\/service\/[^/]+/, '') || '/';
             }
         });
 
         proxy(req, res, next);
-    } catch (error) {
-        return res.status(400).json({ error: 'Malformed target URL provided.' });
+    } catch (e) {
+        return res.status(400).json({ error: 'Failed compiling structural URL string parameters.' });
     }
 });
 
+// Default path fallback to native frontend index
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Proxy web portal listening natively on port ${PORT}`);
+    console.log(`Proxy running on port ${PORT}`);
 });
