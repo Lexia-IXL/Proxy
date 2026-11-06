@@ -6,63 +6,53 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Host static assets safely from the public folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 1. ENGINE SEARCH ROUTER - Decoupled query processor
-app.get('/engine/search', (req, res) => {
+// 1. SEARCH ENGINE CONSOLE LOOKUP
+app.get('/engine/lookup', (req, res) => {
     const query = req.query.q;
-    const type = req.query.type || 'web';
+    const mode = req.query.mode || 'web';
 
-    if (!query) {
-        return res.redirect('/');
+    if (!query) return res.redirect('/');
+
+    if (/^https?:\/\/[^\s$.?#].[^\s]*$/i.test(query.trim())) {
+        return res.redirect(`/service/${encodeURIComponent(query.trim())}`);
     }
 
-    // Hand-off target to decentralized privacy routing matrices
-    let targetRedirect = '';
-    if (type === 'video' || query.toLowerCase().includes('youtube.com') || query.toLowerCase().includes('youtube')) {
-        // Strip down query parameters to extract standard search indicators if present
-        const searchTerms = query.replace(/https?:\/\/(www\.)?youtube\.com\/results\?search_query=/, '').replace(/https?:\/\/(www\.)?youtube\.com\//, '');
-        // Route through high-speed decentralized open video index nodes
-        targetRedirect = `/service/${encodeURIComponent('https://yewtu.be' + encodeURIComponent(searchTerms))}`;
-    } else if (type === 'web') {
-        // Route web requests via DuckDuckGo's lightweight, non-JS tracking template
-        targetRedirect = `/service/${encodeURIComponent('https://duckduckgo.com' + encodeURIComponent(query))}`;
+    if (mode === 'video' || query.toLowerCase().includes('youtube')) {
+        const scrubbedTerms = encodeURIComponent(query.replace(/youtube/gi, '').trim());
+        return res.redirect(`/service/${encodeURIComponent('https://yewtu.be' + scrubbedTerms)}`);
+    } else {
+        const scrubbedTerms = encodeURIComponent(query.trim());
+        return res.redirect(`/service/${encodeURIComponent('https://duckduckgo.com' + scrubbedTerms)}`);
     }
-
-    return res.redirect(targetRedirect);
 });
 
-// 2. REWRITING REVERSE PROXY CORE ENGINE
+// 2. REWRITING PROXY ENGINE WITH ACTIVE ERROR INTERCEPTION ALERT
 app.use('/service/:targetUrl*', (req, res, next) => {
-    let targetParam = req.params.targetUrl;
-
-    if (!targetParam) {
-        return res.status(400).json({ error: 'Missing destination parameter.' });
-    }
+    let rawTarget = req.params.targetUrl;
+    if (!rawTarget) return res.status(400).json({ error: 'Missing target URL context.' });
 
     try {
-        let decodedTarget = decodeURIComponent(targetParam);
+        let decodedTarget = decodeURIComponent(rawTarget);
         if (!/^https?:\/\//i.test(decodedTarget)) {
             decodedTarget = 'https://' + decodedTarget;
         }
 
         const parsedUrl = new URL(decodedTarget);
         const targetOrigin = parsedUrl.origin;
-        const proxyBaseUrl = `${req.protocol}://${req.get('host')}/service/`;
+        const serverHostBase = `${req.protocol}://${req.get('host')}/service/`;
 
-        const proxy = createProxyMiddleware({
+        const proxyEngine = createProxyMiddleware({
             target: targetOrigin,
             changeOrigin: true,
             followRedirects: true,
             secure: true,
-            selfHandleResponse: true, // Intercept to inject rewritten link targets
+            selfHandleResponse: true,
 
             on: {
                 proxyReq: (proxyReq, req, res) => {
-                    proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-                    proxyReq.setHeader('Referer', targetOrigin);
-                    proxyReq.setHeader('Origin', targetOrigin);
+                    proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
                     proxyReq.setHeader('Accept-Encoding', 'identity');
                 },
                 proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
@@ -71,58 +61,64 @@ app.use('/service/:targetUrl*', (req, res, next) => {
                     delete res.getHeaders()['content-security-policy'];
                     delete res.getHeaders()['content-security-policy-report-only'];
                     delete res.getHeaders()['x-frame-options'];
+                    
                     res.setHeader('Access-Control-Allow-Origin', '*');
 
                     if (contentType.includes('text/html')) {
                         let htmlContent = responseBuffer.toString('utf8');
-                        const root = parse(htmlContent);
+                        const domRoot = parse(htmlContent);
 
-                        const convertToProxyPath = (urlStr) => {
-                            if (!urlStr || urlStr.startsWith('javascript:') || urlStr.startsWith('#') || urlStr.startsWith('data:')) {
-                                return urlStr;
-                            }
+                        const injectProxyPath = (originalPath) => {
+                            if (!originalPath || originalPath.startsWith('javascript:') || originalPath.startsWith('#') || originalPath.startsWith('data:')) return originalPath;
                             try {
-                                const absoluteUrl = new URL(urlStr, targetOrigin).href;
-                                return proxyBaseUrl + encodeURIComponent(absoluteUrl);
-                            } catch (e) {
-                                return urlStr;
+                                const absoluteTargetUrl = new URL(originalPath, targetOrigin).href;
+                                return serverHostBase + encodeURIComponent(absoluteTargetUrl);
+                            } catch (err) {
+                                return originalPath;
                             }
                         };
 
-                        // Transform standard nodes to pass down recursively through our domain path layer
-                        root.querySelectorAll('a').forEach(el => el.setAttribute('href', convertToProxyPath(el.getAttribute('href'))));
-                        root.querySelectorAll('script').forEach(el => el.setAttribute('src', convertToProxyPath(el.getAttribute('src'))));
-                        root.querySelectorAll('link').forEach(el => el.setAttribute('href', convertToProxyPath(el.getAttribute('href'))));
-                        root.querySelectorAll('img').forEach(el => el.setAttribute('src', convertToProxyPath(el.getAttribute('src'))));
-                        root.querySelectorAll('form').forEach(el => el.setAttribute('action', convertToProxyPath(el.getAttribute('action'))));
+                        domRoot.querySelectorAll('a').forEach(el => el.setAttribute('href', injectProxyPath(el.getAttribute('href'))));
+                        domRoot.querySelectorAll('script').forEach(el => el.setAttribute('src', injectProxyPath(el.getAttribute('src'))));
+                        domRoot.querySelectorAll('link').forEach(el => el.setAttribute('href', injectProxyPath(el.getAttribute('href'))));
+                        domRoot.querySelectorAll('img').forEach(el => el.setAttribute('src', injectProxyPath(el.getAttribute('src'))));
+                        domRoot.querySelectorAll('form').forEach(el => el.setAttribute('action', injectProxyPath(el.getAttribute('action'))));
+                        domRoot.querySelectorAll('iframe').forEach(el => el.setAttribute('src', injectProxyPath(el.getAttribute('src'))));
 
-                        return root.toString();
+                        return domRoot.toString();
                     }
-
                     return responseBuffer;
                 }),
                 error: (err, req, res) => {
+                    console.error("Proxy routing layer failure:", err.message);
+                    
+                    // Serve a dynamic script block if connection drops or targets are unreachable
                     if (!res.headersSent) {
-                        res.status(500).json({ error: 'Proxy Node Timed Out', details: err.message });
+                        res.setHeader('Content-Type', 'text/html');
+                        res.status(200).send(`
+                            <script>
+                                alert("⚠️ Proxy Notice: The destination server is unreachable, down, or dropping traffic connections.");
+                                window.location.href = "/";
+                            </script>
+                        `);
                     }
                 }
             },
-            pathRewrite: (rawPath, req) => {
-                return rawPath.replace(/^\/service\/[^/]+/, '') || '/';
+            pathRewrite: (processedPath, req) => {
+                return processedPath.replace(/^\/service\/[^/]+/, '') || '/';
             }
         });
 
-        proxy(req, res, next);
-    } catch (e) {
-        return res.status(400).json({ error: 'Failed parsing parameters.' });
+        proxyEngine(req, res, next);
+    } catch (error) {
+        return res.status(400).json({ error: 'Parsing runtime breakdown.' });
     }
 });
 
-// Direct catch-all routing fallback rules to primary interface
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Ultimate Proxy Portal operating on port ${PORT}`);
+    console.log(`Production Portal Active on Port ${PORT}`);
 });
